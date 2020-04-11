@@ -1,0 +1,1 @@
+"""The Hunddata sensor integration."""
