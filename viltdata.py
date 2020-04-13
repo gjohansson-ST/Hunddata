@@ -157,7 +157,7 @@ class viltdata(hass.Hass):
       new_time = datetime.datetime.now()
       date_str = new_time.strftime("%Y-%m-%d")
       time_str = new_time.strftime("%H:%M:%S")
-      if new_time + timedelta(minutes=-2) > datetime.datetime.strptime(self.get_state("input_datetime.vetdata_lastupdate"), "%Y-%m-%d %H:%M:%S"):
+      if new_time + timedelta(minutes=-2) > datetime.datetime.strptime(self.get_state("input_datetime.viltdata_lastupdate"), "%Y-%m-%d %H:%M:%S"):
         #self.log("Run only once?")
         self.call_service("input_datetime/set_datetime",
           entity_id = "input_datetime.viltdata_lastupdate",
