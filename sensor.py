@@ -1,15 +1,26 @@
 """Support for getting data from websites with scraping."""
 import logging
-
+import json
+import requests
 from bs4 import BeautifulSoup
 import voluptuous as vol
-from vetdata import HUNDDATA_LIST
+from custom_components.hunddata.vetdata import hunddata_list
+
 
 from homeassistant.components.rest.sensor import RestData
 from homeassistant.components.sensor import PLATFORM_SCHEMA
 from homeassistant.const import (
+    CONF_AUTHENTICATION,
+    CONF_HEADERS,
     CONF_NAME,
-    CONF_DOG,
+    CONF_PASSWORD,
+    CONF_RESOURCE,
+    CONF_UNIT_OF_MEASUREMENT,
+    CONF_USERNAME,
+    CONF_VALUE_TEMPLATE,
+    CONF_VERIFY_SSL,
+    HTTP_BASIC_AUTHENTICATION,
+    HTTP_DIGEST_AUTHENTICATION,
 )
 from homeassistant.exceptions import PlatformNotReady
 import homeassistant.helpers.config_validation as cv
@@ -26,32 +37,44 @@ DEFAULT_VERIFY_SSL = True
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
-        vol.Required(CONF_DOG): cv.string,
-        vol.Required(CONF_NAME): cv.string,
+        vol.Optional(CONF_RESOURCE): cv.string,
+        vol.Required(CONF_SELECT): cv.string,
+        vol.Optional(CONF_ATTR): cv.string,
+        vol.Optional(CONF_INDEX, default=0): cv.positive_int,
+        vol.Optional(CONF_AUTHENTICATION): vol.In(
+            [HTTP_BASIC_AUTHENTICATION, HTTP_DIGEST_AUTHENTICATION]
+        ),
+        vol.Optional(CONF_HEADERS): vol.Schema({cv.string: cv.string}),
+        vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
+        vol.Optional(CONF_PASSWORD): cv.string,
+        vol.Optional(CONF_UNIT_OF_MEASUREMENT): cv.string,
+        vol.Optional(CONF_USERNAME): cv.string,
+        vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
+        vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): cv.boolean,
     }
 )
 
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
-    """Set up the Web scrape sensor."""
+    _LOGGER.debug("Adding sensor component: Hunddata ...")
+    """Set up the  sensor."""
     name = config.get(CONF_NAME)
-    dog = config.get(CONF_DOG)
     verify_ssl = config.get(CONF_VERIFY_SSL)
     select = config.get(CONF_SELECT)
     attr = config.get(CONF_ATTR)
     index = config.get(CONF_INDEX)
+    unit = "hund"
     value_template = config.get(CONF_VALUE_TEMPLATE)
     if value_template is not None:
         value_template.hass = hass
 
-    json_data = json.loads(HUNDDATA_LIST(dog))
-    json_data.update()
-
-    if json_data.data is None:
-        raise PlatformNotReady
+    json_data = hunddata_list(select)
+    #json_data.update()
+    #if json_data.data is None:
+    #    raise PlatformNotReady
 
     add_entities(
-        [ScrapeSensor(json_data, name, select, attr, index, value_template, unit)], True
+        [Hunddata(json_data, name, select, attr, index, value_template, unit)], True
     )
 
 
@@ -86,28 +109,15 @@ class Hunddata(Entity):
 
     def update(self):
         """Get the latest data from the source and updates the state."""
-        self.json_data.update()
-        if self.json_data.data is None:
+        read = hunddata_list(self._select)
+        self.json_data = json.loads(read)
+
+        if self.json_data is None:
             _LOGGER.error("Unable to retrieve data")
             return
 
-        raw_data = BeautifulSoup(self.json_data.data)
+        #raw_data = BeautifulSoup(self.json_data)
         #raw_data = BeautifulSoup(self.json_data.data, "html.parser")
-        _LOGGER.debug(raw_data)
+        _LOGGER.debug(self.json_data)
 
-        try:
-            if self._attr is not None:
-                value = raw_data.select(self._select)[self._index][self._attr]
-            else:
-                value = raw_data.select(self._select)[self._index].text
-            _LOGGER.debug(value)
-        except IndexError:
-            _LOGGER.error("Unable to extract data from HTML")
-            return
-
-        if self._value_template is not None:
-            self._state = self._value_template.render_with_possible_json_value(
-                value, None
-            )
-        else:
-            self._state = value
+        self._state = self.json_data["Datum"]
