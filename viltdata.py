@@ -15,6 +15,7 @@ import hassapi as hass
 class viltdata(hass.Hass):
 
   def initialize(self):
+
     #collect arg list
     self.hund_id = self.args["hund"]
     #run every 15 minutes
